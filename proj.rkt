@@ -103,7 +103,6 @@
      (where (((l_z o_z) ...) () ) (evict ((l_k o_k) (l_k2 o_k2) ...) ((l_y o_y) ...)))  ;;;; the new memory without appending the block
      (where ro_2 ((l_z o_z) ... (l_x o_x) ...))
    --------------------------------------------------------------------------------------- read_nu_2_2
-     ;(rjud  ((name mu_1 ((l_1 o_1) ... (l_i o_i) (l_2 o_2) ...)) ((l_k o_k) (l_k2 o_k2) ...) nu) l_i (mu_2 ro_2 nu) 1 o_i)
      (rjud  ((name mu_1 ((l_1 o_1) ... (l_i o_i) (l_2 o_2) ...)) ((l_k o_k) (l_k2 o_k2) ...) nu) l_i (mu_2 ro_2 nu) 1 o_i)                              
    ]    
   )
@@ -112,29 +111,51 @@
 
 
 
-#;(define-judgment-form pcf
+(define-judgment-form pcf
   #:contract(aljud sig o r n sig l)
   #:mode(aljud I I I O O O)
 
 
   [
-   
+  (side-condition ,(<= (term (getl (mergemem ((mergemem(r (locsfilter (locs(o))))) (extractlocs nu))) 0)) 16) )
+  (where l (lgen))
+  (where nu_2 ((l_1 o_1) ... (l o)))
   ------------------------------------ allocation
-   (aljud sig o r n sig l)                                       
+   (aljud (name sig_1 (mu ro (name nu ((l_1 o_1) ...)))) o r 0 (mu ro nu_2) l)                                       
   ]
 
   )
 
-
+;(judgment-holds (aljud (((1 2) (3 4)) () ((3 4)(5 6))) 33 (3 5) n sig l) l)
 
 
 (define-metafunction pcf
   locs : any -> (l ...)
-  [(locs l) (l)]
-  [(locs s(l)) (l) ]
+  [(locs (l)) (l)]
+  [(locs (s(l))) (l)]
+  [(locs (app(l -))) (l)]
+  [(locs (app(- l)))(l)]
+  [(locs (app(e_1 e_2))) (mergemem ( (locs(e_1)) (locs(e_2))))]
+  [(locs (fun(l_1 l_2 e))) (locs (e))]
+  [(locs (fun(x_1 x_2 e))) (locs (e))]
+  [(locs (e)) ()] ;; if e is none of the above, it is will not have a location
+)
+
+(define-metafunction pcf
+  locsfilter : (any ...) -> (any ...)
+  [(locsfilter (any ...))(locsfilterh (any ...) ())])
+
+(define-metafunction pcf
+  locsfilterh : (any ...) (any ...) -> (any ...)
+  [(locsfilterh (() any_2 ...) (any_3 ...))(locsfilterh (any_2 ...) (any_3 ...))]
+  [(locsfilterh (any_1 any_2 ...) (any_3 ...)) (locsfilterh (any_2 ...) (any_3 ... any_1))]
+  [(locsfilterh () (any_3 ...)) (any_3 ...)])
+  
+  
+(define-metafunction pcf
+  [(lgen) ,(random 9999999)]
   )
-
-
+  
 ;;; Function that checks if 
 (define-metafunction pcf
   notin : (any ...) (any) -> #t or #f
@@ -200,6 +221,17 @@
   )
 
 
+
+
+
+;;extract locations from a nursery
+(define-metafunction pcf
+  extractlocs : (any ...) -> (any ...)
+  [(extractlocs ( (any_1 any_2) ...)) (any_1 ...)]
+  )
+
+
+
 ;; test for reading from allocation cache (nursery)
 (test-equal (judgment-holds (rjud (((1 2) (2 3) (3 5) (5 6)) ((8 9) (9 10) (10 11)) ((1 2))) 1 sig n o) o) '(2))
 ;(test-equal (judgment-holds (rjud (((2 3) (3 5) (5 6)) ((8 9) (9 10) (1 2)) ()) 1 sig n o) o) '(2))
@@ -209,4 +241,11 @@
 ;; witout eviction
 (judgment-holds (rjud (((1 2) (2 3) (3 5) (5 6)) ((8 9) (9 10) (10 11) (6 9) (12 12) (11 11) (14 15)) ((11 22))) 1 sig n o) sig)
 (judgment-holds (rjud (((1 2) (2 3) (3 5) (5 6)) ((8 9) (9 10) (10 11) (6 9) (12 12) (11 11) (14 15)) ((11 22))) 1 sig n o) o)
+
+
+;; Allocation in action, we insert a new object ( 33 ) into the nu with roots (3 5 8 ...) .
+;; Allocation number is randomly selected using a helper.
+;; Since it is random, we cannot write a test-equals? for this, thus we will just print it here.
+(judgment-holds (aljud (((1 2) (3 4)) () ((3 4)(5 6))) 33 (3 5 8 9 10 12 13 14 15 16 17 18 19 99 100) n sig l) sig)
+
 (test-results)
