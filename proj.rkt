@@ -1,6 +1,5 @@
 #lang racket
 (require redex)
-
 (define-language pcf
   (e ::= ;; expressions 
      x
@@ -32,6 +31,8 @@
      (app(- e))
      (ifz(- e e))
      (s(-))
+     (app (e -))
+     (app (l -))
      n
   )
   (blksz 4)
@@ -72,9 +73,9 @@
    ]
 
 
-  #;[  (side-condition(notin ((l_k o_k) ...) (l_i)))
-     (side-condition(notin (nu) (l_i)))
-     (side-condition ,(< (term (getl ((l_k o_k) ...) 0)) 4))
+  [  (side-condition (notin ((l_k o_k) ...) (l_i)))
+     (side-condition (notin nu (l_i)))
+     (side-condition ,(< (term (getl ((l_k o_k) ...) 0)) 12))
      (where ((l_x o_x) ...) (nbhd mu_1 l_i))
    --------------------------------------------------------------------------------------- read_nu_1
      (rjud  ((name mu_1 ((l_1 o_1) ... (l_i o_i) (l_2 o_2) ...)) ((l_k o_k) ...) nu)
@@ -83,8 +84,8 @@
 
     
   #;[  (side-condition(notin ((l_k o_k) ...) (l_i)))
-     (side-condition(notin (nu) (l_i)))
-     (side-condition ,(< (term (getl ((l_k o_k) ...) 0)) 4))
+     (side-condition(notin nu (l_i)))
+     (side-condition ,(< (term (getl ((l_k o_k) ...) 0)) 12))
      (where ((l_x o_x) ...) (nbhd mu_1 l_i))
    --------------------------------------------------------------------------------------- read_nu_2
      (rjud  ((name mu_1 ((l_1 o_1) ... (l_i o_i) (l_2 o_2) ...)) ((l_k o_k) ...) nu)
@@ -93,20 +94,18 @@
 
 
 
-  #;[  (side-condition(notin ((l_k o_k) (l_k2 o_k2) ...) (l_i)))
-     (side-condition(notin (nu) (l_i)))
-     (side-condition(> (term (getl ((l_k o_k) (l_k2 o_k2) ...) 0)) 4))
+  [(side-condition(notin ((l_k o_k) (l_k2 o_k2) ...) (l_i)))
+     (side-condition(notin nu (l_i)))
+     (side-condition ,(> (term (getl ((l_k o_k) (l_k2 o_k2) ...) 0)) 12))
      (where ((l_x o_x) ...) (nbhd mu_1 l_i))  ;; get the block containing our location as l_x o_x
      (where ((l_y o_y) ...) (nbhd ((l_k o_k) (l_k2 o_k2) ...) l_k)) ;; removing the first block from the read cache
      (where mu_2 (mergemem (mu_1 ( (l_y o_y) ...)))) ;;;; the new mu after merging the first block of read cache
-     (where ((l_z o_z) ...) (evict ((l_k o_k) (l_k2 o_k2) ...) ((l_y o_y) ...)))  ;;;; the new memory without appending the block
-     (where ro_2 ( (l_z o_z) ... (l_x o_x) ...))
+     (where (((l_z o_z) ...) () ) (evict ((l_k o_k) (l_k2 o_k2) ...) ((l_y o_y) ...)))  ;;;; the new memory without appending the block
+     (where ro_2 ((l_z o_z) ... (l_x o_x) ...))
    --------------------------------------------------------------------------------------- read_nu_2_2
-     (rjud  ((name mu_1 ((l_1 o_1) ... (l_i o_i) (l_2 o_2) ...)) ((l_k o_k) (l_k2 o_k2) ...) nu) l_i (mu_2 ro_2 nu) 1 o_i)
-                                   
-   ]
-
-    
+     ;(rjud  ((name mu_1 ((l_1 o_1) ... (l_i o_i) (l_2 o_2) ...)) ((l_k o_k) (l_k2 o_k2) ...) nu) l_i (mu_2 ro_2 nu) 1 o_i)
+     (rjud  ((name mu_1 ((l_1 o_1) ... (l_i o_i) (l_2 o_2) ...)) ((l_k o_k) (l_k2 o_k2) ...) nu) l_i (mu_2 ro_2 nu) 1 o_i)                              
+   ]    
   )
 
 
@@ -126,6 +125,17 @@
 
   )
 
+
+
+
+(define-metafunction pcf
+  locs : any -> (l ...)
+  [(locs l) (l)]
+  [(locs s(l)) (l) ]
+  )
+
+
+;;; Function that checks if 
 (define-metafunction pcf
   notin : (any ...) (any) -> #t or #f
   [(notin (any_1 ... (any any_3) any_2 ...) (any)) #f]
@@ -146,10 +156,6 @@
 
 
 
-
-
-
-
 ;;;;;;;;;;; merge the memory that is evicted into the main ;;;;;;;;;;;;;;;; removing all dups
 (define-metafunction pcf
   mergemem : ((any ...) (any ...)) -> ((any ...) (any ...)) or (any ...)
@@ -158,10 +164,6 @@
    ]
  [(mergemem ((any_1 ...) (any_2 any_3 ...))) ( mergemem ((any_1 ... any_2) (any_3 ...)))]
 )
-
-
-
-
 
 
 (define-metafunction pcf
@@ -200,6 +202,11 @@
 
 ;; test for reading from allocation cache (nursery)
 (test-equal (judgment-holds (rjud (((1 2) (2 3) (3 5) (5 6)) ((8 9) (9 10) (10 11)) ((1 2))) 1 sig n o) o) '(2))
-(test-equal (judgment-holds (rjud (((2 3) (3 5) (5 6)) ((8 9) (9 10) (1 2)) ()) 1 sig n o) o) '(2))
+;(test-equal (judgment-holds (rjud (((2 3) (3 5) (5 6)) ((8 9) (9 10) (1 2)) ()) 1 sig n o) o) '(2))
 (term (evict ((1 2) (2 3) (4 31) (32 33)) ((2 3))))
+;; reading a block from main with eviction.
+(judgment-holds (rjud (((1 2) (2 3) (3 5) (5 6)) ((8 9) (9 10) (10 11) (6 9) (12 12) (11 11) (14 15) (111 222) (333 444) (555 666) (777 888) (999 111) (123 345) (567 789) (910 911)) ((11 22))) 1 sig n o) sig)
+;; witout eviction
+(judgment-holds (rjud (((1 2) (2 3) (3 5) (5 6)) ((8 9) (9 10) (10 11) (6 9) (12 12) (11 11) (14 15)) ((11 22))) 1 sig n o) sig)
+(judgment-holds (rjud (((1 2) (2 3) (3 5) (5 6)) ((8 9) (9 10) (10 11) (6 9) (12 12) (11 11) (14 15)) ((11 22))) 1 sig n o) o)
 (test-results)
