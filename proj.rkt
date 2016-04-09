@@ -1,6 +1,8 @@
 #lang racket
 (require redex)
 (caching-enabled? #f)
+(require redex "tut-subst.rkt")
+
 (define-language pcf
   (e ::= ;; expressions 
      x
@@ -17,7 +19,7 @@
      z
      (s(l))
      )
-  (z 0)
+  ;(z 0)
   (mu ((l o) ...))
   (ro ((l o) ...))
   (nu ((l o) ...))
@@ -28,13 +30,14 @@
   (r ::=
      (l ...))
   (n ::= number)
-  (o ::= v
-     (app(- e))
-     (ifz(- e e))
+  (o ::= v  ;; since all values can also be stored as objects
+     e ;;since all expressions can also be stored as objects.
+     (app(- o))
+     (ifz(- o o))
      (s(-))
-     (app (e -))
-     (app (l -))
-     (app (l l))
+     (app (o -))
+     (app (o -))
+     (app (o o))
      n
   )
   (blksz 4)
@@ -62,6 +65,18 @@
 
 
 
+  #;[
+   (aljud sig (s(-)) (mergemem (r (locs e))) n_1 sig_ss l_ss) ;; stackframe for successor
+   (evdy sig_ss e (mergemem (r (l_ss))) n_se sig_se l_se) ;; the inner expr of s(e)
+   (aljud sig_se (s(l_se)) r n_sl sig_sl l_sl)
+   (where n ,(+ (term n_1) (term n_se) (term n_sl)))
+  --------------------------------------------------------------------- tsucc
+   (evdy sig (s(e)) r n sig_sl l_sl)
+  ]
+
+
+
+
   [
    (aljud sig (s(-)) (mergemem (r (locs e))) n_1 sig_ss l_ss) ;; stackframe for successor
    (evdy sig_ss e (mergemem (r (l_ss))) n_se sig_se l_se) ;; the inner expr of s(e)
@@ -70,6 +85,29 @@
   --------------------------------------------------------------------- tsucc
    (evdy sig (s(e)) r n sig_sl l_sl)
   ]
+
+  #;[ (aljud sig (ifz(- e_2 x e_3)) (mergemem (r (locs e_1))) n_st1 sig_st1 l_st1)
+    ()
+
+   ----------------------------------------------------------------------- tifz0
+      (evdy sig (if(e_1 e_2 x e_3)) r n sig_final l_final)                                                                     
+                                                                           
+   ]
+
+  [
+   (aljud sig (app(- e_2)) (mergemem(r (locs e_1))) n_stack sig_stack1 l_stack1)
+   (evdy sig_stack1 e_1 (mergemem(r (locs l_stack1))) n_e1 sig_e1 l_e1)
+   (rjud sig_e1 l_e1 sig_e n_e o_e)
+   (where (fun (o_1 o_2 o_3)) o_e)
+   (aljud sig_e (app(l_e1 -)) r n_appstack sig_app l_app)
+   (evdy sig_app e_2 (mergemem(r (locs l_app))) n_e2 sig_e2 l_e2)
+   (where o_subst (subst o_1 l_e1 o_3))
+   (where o_subst2 (subst o_2 l_e2 o_subst))
+   (evdy sig_e1 o_subst2 r n_subst sig_final l_final)
+   ---------------------------------------------------------------------------- tapp
+   ;(evdy sig (app(e_1 e_2)) r ,(+ (term n_stack) (term n_e1) (term n_e2) (term n_appstack) (term n_subst)) sig_final l_final)
+   (evdy sig (app(e_1 e_2)) r ,(+ (term n_stack) (term n_e1) (term n_e2) (term n_appstack)) (() () ((1 o_subst2) )) l_e2)
+   ]
   
   )
 
@@ -170,6 +208,18 @@
 
 
 (define-metafunction pcf
+  subst : x o o -> o
+  [(subst x o_1 o)
+   ,(subst/proc (redex-match pcf x)
+                (term (x))
+                (term (o_1))
+                (term o))])
+
+
+
+
+
+(define-metafunction pcf
   locs : any -> (l ...)
   [(locs (l)) (l)]
   [(locs l) (l)]
@@ -178,6 +228,8 @@
   [(locs (s(-))) ()]
   [(locs (app(l -))) (l)]
   [(locs (app(- l)))(l)]
+  [(locs (app(- e))) (locs e)]
+  [(locs (app(e -))) (locs e)]
   [(locs (app(e_1 e_2))) (mergemem ( (locs e_1) (locs e_2)))]
   [(locs (fun(l_1 l_2 e))) (locs e)]
   [(locs (fun(x_1 x_2 e))) (mergemem((locs e) (locsfilter ((locs x_1) (locs x_2))) ))]
@@ -337,9 +389,10 @@
 ;;Allocation 
 (judgment-holds (evdy (((1 2)) () ((1 2) (2 3) (3 4) (4 5))) (fun(y x (s(99)))) (1 2) n sig l ) sig)
 
-;;;; A really weird allocation test. using a lot of successors, we force allocation of a large amount of stack.
+;;;; A really weird allocation test. using a lot of successors, we force allocation of a large amount of stack. until finally
+;;;; z is allocated, and then evicted.
 (test-equal (judgment-holds (evdy (((1 2)) () ())
-                      (s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s (0))))))))))))))))))))))))))))))
+                      (s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s (z))))))))))))))))))))))))))))))
                       (1 2) n sig l
-                        ) n) '(6))
+                        ) n) '(5))
 (test-results)
