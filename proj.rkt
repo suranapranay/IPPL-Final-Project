@@ -337,4 +337,9 @@
 ;;Allocation 
 (judgment-holds (evdy (((1 2)) () ((1 2) (2 3) (3 4) (4 5))) (fun(y x (s(99)))) (1 2) n sig l ) sig)
 
+;;;; A really weird allocation test. using a lot of successors, we force allocation of a large amount of stack.
+(test-equal (judgment-holds (evdy (((1 2)) () ())
+                      (s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s (0))))))))))))))))))))))))))))))
+                      (1 2) n sig l
+                        ) n) '(6))
 (test-results)
