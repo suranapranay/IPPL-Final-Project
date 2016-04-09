@@ -33,6 +33,7 @@
      (s(-))
      (app (e -))
      (app (l -))
+     (app (l l))
      n
   )
   (blksz 4)
@@ -41,7 +42,7 @@
 
 ;;blocksize = 2 , cachesize (ro or mu) = 4
 
-#;(define-judgment-form pcf
+(define-judgment-form pcf
   #:contract (evdy sig e r n sig l) 
   #:mode (evdy I I I O O O)
 
@@ -116,14 +117,37 @@
   #:mode(aljud I I I O O O)
 
 
+  ;; search the roots for transitively available locations in the memory (live object enumeration)
+  ;; if the total number of live objects is less than 16, we can do an allocation!
+  ;; else we move to the next condition.
+
   [
-  (side-condition ,(<= (term (getl (mergemem ((mergemem(r (locsfilter (locs(o))))) (extractlocs nu))) 0)) 16) )
+  ;(side-condition ,(<= (term (getl (mergemem ((mergemem(r (locsfilter (locs(o))))) (extractlocs nu))) 0)) 16) )
+  ;(side-condition ,(<= (term (getl (transitivereach nu (mergemem (r (locsfilter (locs o)))) ()) 0)) 16) )
+  (where r_x (mergemem (r (locsfilter (locs o)))))
+  (where r_xx (transitivereach nu r_x ()))
+  (side-condition ,(< (term (getl r_xx 0)) 16))
   (where l (lgen))
   (where nu_2 ((l_1 o_1) ... (l o)))
   ------------------------------------ allocation
-   (aljud (name sig_1 (mu ro (name nu ((l_1 o_1) ...)))) o r 0 (mu ro nu_2) l)                                       
+   (aljud (name sig_1 (mu ro (name nu ((l_1 o_1) ...)))) o r 0 (mu ro nu_2) l)
   ]
 
+[
+  
+  (where r_x (mergemem (r (locsfilter (locs o)))))
+  (where r_xx (transitivereach nu r_x ()))
+  (side-condition ,(>= (term (getl r_xx 0)) 16))
+  (where l (lgen))
+  (where ((l_n o_n) ...) (nbhd nu l_1))
+  (where (((l_nevicted o_nevicted) ...) ()) (evict nu ((l_n o_n) ...))) ;;; evict oldest block from nu
+  (where nu_2 ((l_nevicted o_nevicted) ... (l o))) ;;; allocate the new one.just add object to the newly evicted nu.
+  (where mu_2 (mergemem (mu ((l_n o_n) ...))))
+  ------------------------------------ allocation_with_eviction
+   (aljud (name sig_1 (mu ro (name nu ((l_1 o_1) (l_11 o_11) ...)))) o r 0 (mu_2 ro nu_2) l)
+  ]
+
+  
   )
 
 ;(judgment-holds (aljud (((1 2) (3 4)) () ((3 4)(5 6))) 33 (3 5) n sig l) l)
@@ -132,6 +156,7 @@
 (define-metafunction pcf
   locs : any -> (l ...)
   [(locs (l)) (l)]
+  [(locs l) (l)]
   [(locs (s(l))) (l)]
   [(locs (app(l -))) (l)]
   [(locs (app(- l)))(l)]
@@ -232,6 +257,30 @@
 
 
 
+;;transitivereach (nu) (roots) () returns all possible values reached through the roots in the nursery.
+;; example transitivereach ( (1 2) (2 3) (3 4)) (1) () --> will output (1 2 3 4), since from 1 we can reach all 1 2 3 4 locations.
+;; This is function essentially finds out the  LIVE elements of the nursery.
+
+(define-metafunction pcf
+  transitivereach : (any ...) (any ...)(any ...) -> (any ...)
+  [(transitivereach ((l_1 o_1) ... (l o) (l_2 o_2) ...) (l l_x ...) (l_z ...))
+   (transitivereach ((l_1 o_1) ... (l_2 o_2) ...) (l_x ... l_new ...) (l_z ... l))
+   (where (l_new ...) (locsfilter ( locs o)))]
+  [(transitivereach ((l_1 o_1) ... ) (l l_x ...) (l_z ...))
+   (transitivereach ((l_1 o_1) ...) (l_x ...) (l_z ... l))]
+  [(transitivereach () (any ...) (any_2 ...)) (any_2 ...)]
+  [(transitivereach (any ...) () (any_1 ...)) (any_1 ...)]
+  )
+
+
+;;
+;; 
+(test-equal (term(transitivereach ((1 (app(2 2))) (2 3) (3 4)) (1) ())) '(1 2 3 4))
+;; example where the path is not complete
+(test-equal (term(transitivereach ((1 (app(2 2))) (2 3) (3 4) (5 6) (8 9) (4 7)) (1) ())) '(1 2 3 4 7))
+;; example with path complete
+(test-equal (term(transitivereach ((1 (app(2 2))) (2 3) (3 4) (5 6) (8 9) (4 7) (7 5)) (1) ())) '(1 2 3 4 7 5 6))
+
 ;; test for reading from allocation cache (nursery)
 (test-equal (judgment-holds (rjud (((1 2) (2 3) (3 5) (5 6)) ((8 9) (9 10) (10 11)) ((1 2))) 1 sig n o) o) '(2))
 ;(test-equal (judgment-holds (rjud (((2 3) (3 5) (5 6)) ((8 9) (9 10) (1 2)) ()) 1 sig n o) o) '(2))
@@ -243,9 +292,29 @@
 (judgment-holds (rjud (((1 2) (2 3) (3 5) (5 6)) ((8 9) (9 10) (10 11) (6 9) (12 12) (11 11) (14 15)) ((11 22))) 1 sig n o) o)
 
 
-;; Allocation in action, we insert a new object ( 33 ) into the nu with roots (3 5 8 ...) .
-;; Allocation number is randomly selected using a helper.
+;; Allocation in action, we insert a new object ( 33 ) into the nu with roots (1 2 ...) .
+;; Allocation number is randomly selected using a helper function getl.
 ;; Since it is random, we cannot write a test-equals? for this, thus we will just print it here.
-(judgment-holds (aljud (((1 2) (3 4)) () ((3 4)(5 6))) 33 (3 5 8 9 10 12 13 14 15 16 17 18 19 99 100) n sig l) sig)
+;; our function "transitivereach" takes into account all the possible paths
+;; and finds all "live" locations as described in the paper.
+;; The following example allocates at 0 cost since the number of "live" objects is just 3 and well less than 16 (cachesize).
+(judgment-holds (aljud (() () ((1 2)  (3 4) (4 5) (5 6) (6 7) (7 8)
+                                     (8 9) (9 10) (10 11) (11 12) (13 14)
+                                     (12 13) (14 15) (15 16) (16 17) (17 18) (18 19) (19 20))) 33
+                                     (1 2) n sig l) sig)
+
+;; Allocation with eviction. This time the number of transitively reacheable objects is greater than 16, thus we evict a block!.
+;; the form is (aljud (mu ro nu) o r n (mu ro nu)_out l)
+;; The RAM (mu) will appear populated with blocks (1 2) ... (4 5).
+;; the same blocks will appear evicted from the nursery (nu).
+;; the nursery will have a new random location added along with the object. This signifies allocation.
+
+(judgment-holds (aljud
+                 (((1 2)) () ((1 2) (2 3) (3 4) (4 5) (5 6) (6 7) (7 8) (8 9)
+                 (9 10) (10 11) (11 12) (13 14) (12 13) (14 15)
+                 (15 16) (16 17) (17 18) (18 19) (19 20))) 33 (1 2)
+                 n sig l) sig)
+
+
 
 (test-results)
