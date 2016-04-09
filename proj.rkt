@@ -1,5 +1,6 @@
 #lang racket
 (require redex)
+(caching-enabled? #f)
 (define-language pcf
   (e ::= ;; expressions 
      x
@@ -50,10 +51,25 @@
   [
    (aljud sig z r n sig_2 l)
   ------------------------------- tz
-    (evdy sig z r n sig l)
+    (evdy sig z r n sig_2 l)
+  ]
+
+ [
+  (aljud sig (fun(x_1 x_2 e)) r n sig_2 l)
+  -------------------------------------- tfun
+   (evdy sig (fun(x_1 x_2 e)) r n sig_2 l)
   ]
 
 
+
+  [
+   (aljud sig (s(-)) (mergemem (r (locs e))) n_1 sig_ss l_ss) ;; stackframe for successor
+   (evdy sig_ss e (mergemem (r (l_ss))) n_se sig_se l_se) ;; the inner expr of s(e)
+   (aljud sig_se (s(l_se)) r n_sl sig_sl l_sl)
+   (where n ,(+ (term n_1) (term n_se) (term n_sl)))
+  --------------------------------------------------------------------- tsucc
+   (evdy sig (s(e)) r n sig_sl l_sl)
+  ]
   
   )
 
@@ -144,7 +160,7 @@
   (where nu_2 ((l_nevicted o_nevicted) ... (l o))) ;;; allocate the new one.just add object to the newly evicted nu.
   (where mu_2 (mergemem (mu ((l_n o_n) ...))))
   ------------------------------------ allocation_with_eviction
-   (aljud (name sig_1 (mu ro (name nu ((l_1 o_1) (l_11 o_11) ...)))) o r 0 (mu_2 ro nu_2) l)
+   (aljud (name sig_1 (mu ro (name nu ((l_1 o_1) (l_11 o_11) ...)))) o r 1 (mu_2 ro nu_2) l)
   ]
 
   
@@ -158,12 +174,14 @@
   [(locs (l)) (l)]
   [(locs l) (l)]
   [(locs (s(l))) (l)]
+  [(locs (s(e))) (locs e)]
+  [(locs (s(-))) ()]
   [(locs (app(l -))) (l)]
   [(locs (app(- l)))(l)]
-  [(locs (app(e_1 e_2))) (mergemem ( (locs(e_1)) (locs(e_2))))]
-  [(locs (fun(l_1 l_2 e))) (locs (e))]
-  [(locs (fun(x_1 x_2 e))) (locs (e))]
-  [(locs (e)) ()] ;; if e is none of the above, it is will not have a location
+  [(locs (app(e_1 e_2))) (mergemem ( (locs e_1) (locs e_2)))]
+  [(locs (fun(l_1 l_2 e))) (locs e)]
+  [(locs (fun(x_1 x_2 e))) (mergemem((locs e) (locsfilter ((locs x_1) (locs x_2))) ))]
+  [(locs e) ()] ;; if e is none of the above, it is will not have a location
 )
 
 (define-metafunction pcf
@@ -178,6 +196,7 @@
   
   
 (define-metafunction pcf
+  lgen : -> any
   [(lgen) ,(random 9999999)]
   )
   
@@ -315,6 +334,7 @@
                  (15 16) (16 17) (17 18) (18 19) (19 20))) 33 (1 2)
                  n sig l) sig)
 
-
+;;Allocation 
+(judgment-holds (evdy (((1 2)) () ((1 2) (2 3) (3 4) (4 5))) (fun(y x (s(99)))) (1 2) n sig l ) sig)
 
 (test-results)
