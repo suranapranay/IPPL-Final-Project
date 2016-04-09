@@ -33,7 +33,8 @@
   (o ::= v  ;; since all values can also be stored as objects
      e ;;since all expressions can also be stored as objects.
      (app(- o))
-     (ifz(- o o))
+     (ifz(- o o o))
+     (ifz(o o o o))
      (s(-))
      (app (o -))
      (app (o -))
@@ -50,6 +51,24 @@
   #:contract (evdy sig e r n sig l) 
   #:mode (evdy I I I O O O)
 
+  ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;IMPORTANT;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;;;;;;;;;; This rule, tl is not mentioned in the paper. I've added this on my own to make
+  ;;;; the existing rules make sense!. This is because the paper makes "liberal" use of
+  ;;; substitutions, but there is no rule to handle the substituted entity.
+  ;;; For eg, a successor s(x), can have a funcion applied to it, and get the x substitued with an
+  ;;; location that points to a z!", but there is not rule to handle the location when we eventually
+  ;;; climb down/up the tree and reach s(l), which itself breaks to "evdy l".
+  ;;; This causes a bug because we do not know what evaluation dynamics on a location should do!
+
+  ;;; My solution just states that if we try to evaluate a "location", we return back the "location" and assign
+  ;;;; 0 cost to it. This is because a "location" is already evaluated and we do not need to do anything for it.
+  ;;;; thus a rule "evdy l" is added.
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  [
+   ;(aljud sig l r n sig_2 l)
+  ------------------------------- tl
+    (evdy sig l r 0 sig l)
+  ]
   
   [
    (aljud sig z r n sig_2 l)
@@ -82,18 +101,29 @@
    (evdy sig_ss e (mergemem (r (l_ss))) n_se sig_se l_se) ;; the inner expr of s(e)
    (aljud sig_se (s(l_se)) r n_sl sig_sl l_sl)
    (where n ,(+ (term n_1) (term n_se) (term n_sl)))
-  --------------------------------------------------------------------- tsucc
+  --------------------------------------------------------------------- tsuccessor
    (evdy sig (s(e)) r n sig_sl l_sl)
   ]
 
-  #;[ (aljud sig (ifz(- e_2 x e_3)) (mergemem (r (locs e_1))) n_st1 sig_st1 l_st1)
-    ()
-
+  [ (aljud sig (ifz(- e_2 x e_3)) (mergemem (r (locs e_1))) n_st1 sig_st1 l_st1)
+    (evdy sig_st1 e_1 (mergemem (r (locs l_st1))) n_e1 sig_e1 l_e1)
+    (rjud sig_e1 l_e1 sig_z n_e z)  
+    (evdy sig_z e_2 r n_final sig_final l_final)
    ----------------------------------------------------------------------- tifz0
-      (evdy sig (if(e_1 e_2 x e_3)) r n sig_final l_final)                                                                     
+    (evdy sig (ifz(e_1 e_2 x e_3)) r ,(+ (term n_st1) (term n_e1) (term n_e) (term n_final)) sig_final l_final)                                                                     
                                                                            
    ]
+  
 
+
+  #;[ (aljud sig (ifz(- e_2 x e_3)) (mergemem (r (locs e_1))) n_st1 sig_st1 l_st1)
+    (evdy sig_st1 e_1 (mergemem (r (locs l_st1))) n_e1 sig_e1 l_e1)
+    (rjud sig_e1 l_e1 sig_z n_e z)  
+    (evdy sig_z e_2 r n_final sig_final l_final)
+   ----------------------------------------------------------------------- tifz!0
+    (evdy sig (ifz(e_1 e_2 x e_3)) r ,(+ (term n_st1) (term n_e1) (term n_e) (term n_final)) sig_final l_final)                                                                     
+                                                                           
+   ]
   [
    (aljud sig (app(- e_2)) (mergemem(r (locs e_1))) n_stack sig_stack1 l_stack1)
    (evdy sig_stack1 e_1 (mergemem(r (locs l_stack1))) n_e1 sig_e1 l_e1)
@@ -103,10 +133,10 @@
    (evdy sig_app e_2 (mergemem(r (locs l_app))) n_e2 sig_e2 l_e2)
    (where o_subst (subst o_1 l_e1 o_3))
    (where o_subst2 (subst o_2 l_e2 o_subst))
-   (evdy sig_e1 o_subst2 r n_subst sig_final l_final)
+   (evdy sig_e2 o_subst2 r n_subst sig_final l_final)
    ---------------------------------------------------------------------------- tapp
-   ;(evdy sig (app(e_1 e_2)) r ,(+ (term n_stack) (term n_e1) (term n_e2) (term n_appstack) (term n_subst)) sig_final l_final)
-   (evdy sig (app(e_1 e_2)) r ,(+ (term n_stack) (term n_e1) (term n_e2) (term n_appstack)) (() () ((1 o_subst2) )) l_e2)
+   (evdy sig (app(e_1 e_2)) r ,(+ (term n_stack) (term n_e1) (term n_e2) (term n_appstack) (term n_subst)) sig_final l_final)
+   ;(evdy sig (app(e_1 e_2)) r ,(+ (term n_stack) (term n_e1) (term n_e2) (term n_appstack)) (() () ((1 o_subst2) )) l_e2)
    ]
   
   )
@@ -207,6 +237,8 @@
 ;(judgment-holds (aljud (((1 2) (3 4)) () ((3 4)(5 6))) 33 (3 5) n sig l) l)
 
 
+
+;; a substitution function.
 (define-metafunction pcf
   subst : x o o -> o
   [(subst x o_1 o)
@@ -227,6 +259,8 @@
   [(locs (s(e))) (locs e)]
   [(locs (s(-))) ()]
   [(locs (app(l -))) (l)]
+  [(locs (ifz(- o_1 o_2 o_3))) (locsfilter (mergemem( (locs o_1) (mergemem ( (locs o_2) (locs o_3))))))]
+  [(locs (ifz(o_0 o_1 o_2 o_3))) (locsfilter (mergemem ( (locs o_0) (mergemem( (locs o_1) (mergemem ( (locs o_2) (locs o_3))))))))]
   [(locs (app(- l)))(l)]
   [(locs (app(- e))) (locs e)]
   [(locs (app(e -))) (locs e)]
@@ -395,4 +429,14 @@
                       (s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s ((s (z))))))))))))))))))))))))))))))
                       (1 2) n sig l
                         ) n) '(5))
+
+
+;;; this demonstrates a combination of ifz, app and fun rules. The application evaluates to a 'z',
+;;; the z is the first argument of ifz and thus 'z' which is e_2 is allocated and we can look at the memory (sig) and the returned
+;;; location of z and verify that the returned location does contain z.
+(judgment-holds (evdy (((1 2)) () ()) (ifz((app((fun(x y y)) z)) z x z)) (1 2) n sig l) (sig l))
+
+;;; This one evaluates to s(z),and tracing the returned l in sig will show that l points to a s(l') and l' will point to z
+(judgment-holds (evdy (((1 2)) () ()) (ifz((app((fun(x y y)) z)) (s(z)) x z)) (1 2) n sig l) (sig l n))
+
 (test-results)
