@@ -452,4 +452,44 @@
 ;;; Thus follows the second branch.
 (judgment-holds (evdy (((1 2)) () ()) (ifz((app((fun(x y y)) (s(z)))) z x z)) (1 2) n sig l) (sig l n))
 
+
+
+;;;;;The failed case. I'm filling the "cache nursery" or "nursery" with junk values, but they are set in such a way that they
+;;;; are not considered "live", this makes the allocation happen inside the nursery!
+;;;; We are not sure if such a case can happen in real life (nursery filled with values not reacheable by the roots).
+;;;; But, we can argue that if there was no such case, then why determine the liveness this way?
+;;;; We could have just measured the whole cache and not just the live values!
+;;; Notice that there is 0 allocation cost!
+
+(judgment-holds (evdy (((1 2)) () ((3 4) (3 4) (3 4) (3 4) (3 4) (3 4) (3 4) (3 4)
+                                         (3 4) (3 4) (3 4) (3 4) (3 4) (3 4) (3 4)
+                                         (3 4) (3 4) (3 4) (3 4) (3 4) (3 4) (3 4)
+                                         (3 4) (3 4)  (3 4) (3 4) (3 4) (3 4) (3 4)
+                                         (3 4) (3 4) (3 4) (3 4) (3 4) (3 4) (3 4)
+                                         (3 4) (3 4) (3 4) (3 4) (3 4)))
+                      (app((fun(copy x
+                       (ifz(x z xx (s((app(copy xx)))))))) z))
+                      (1 2) n sig l) (sig l n))
+
+
+
+
+
+;;;;;;;;;;;;; Since the language is limited, I'm adding a few cases in which we assume that the cache and the roots were already
+;;;;;;;;;;;;; "populated" and we are in mid of a running program. This means that the cache is populated with pseudo locations
+;;;;;;;;;;;;;  and the roots are able to trace it.
+;;;;;;;;;;;;; The read and allocation cache both will be populated.
+(judgment-holds (evdy
+                 (((1 2)) () ((1 2) (2 3) (3 4) (4 5)
+                   (5 6) (6 7) (7 8) (8 9) (9 10) (10 11) ;; the nursery is populated with memory that refers each other in a chain
+                   (11 12) (12 13) (13 14) (14 15) (15 16) ;; the roots are able to reach trace this memory, thus it is considered live
+                   (16 17)))                               ;; this forces the evaluation dynamics to force evictions.
+                 (app((fun(copy x (ifz(x z xx (s((app(copy xx))))))))
+                      (s((app((fun(copy x (ifz(x z xx (s((app(copy xx)))))))) (s(z))))))))
+                 (1 2 3 4 5 6 7 8 9 10) n sig l) (sig n)) ;; we can observe the memory and the cost
+                                                          ;; since I'm printing the memory (sig) and the cost (n).
+
+
+
+
 (test-results)
