@@ -84,14 +84,14 @@
 
 
 
-  #;[
-   (aljud sig (s(-)) (mergemem (r (locs e))) n_1 sig_ss l_ss) ;; stackframe for successor
-   (evdy sig_ss e (mergemem (r (l_ss))) n_se sig_se l_se) ;; the inner expr of s(e)
-   (aljud sig_se (s(l_se)) r n_sl sig_sl l_sl)
-   (where n ,(+ (term n_1) (term n_se) (term n_sl)))
-  --------------------------------------------------------------------- tsucc
-   (evdy sig (s(e)) r n sig_sl l_sl)
-  ]
+;  #;[
+;   (aljud sig (s(-)) (mergemem (r (locs e))) n_1 sig_ss l_ss) ;; stackframe for successor
+;   (evdy sig_ss e (mergemem (r (l_ss))) n_se sig_se l_se) ;; the inner expr of s(e)
+ ;  (aljud sig_se (s(l_se)) r n_sl sig_sl l_sl)
+  ; (where n ,(+ (term n_1) (term n_se) (term n_sl)))
+  ;--------------------------------------------------------------------- tsucc
+  ; (evdy sig (s(e)) r n sig_sl l_sl)
+  ;]
 
 
 
@@ -254,6 +254,8 @@
 
 (define-metafunction pcf
   locs : any -> (l ...)
+  [(locs x) ()]     ;; we want to discards locations from these.
+  [(locs (x)) ()]   ;;;;;;;;;;;;;;;;;
   [(locs (l)) (l)]
   [(locs l) (l)]
   [(locs (s(l))) (l)]
@@ -266,7 +268,7 @@
   [(locs (app(- e))) (locs e)]
   [(locs (app(e -))) (locs e)]
   [(locs (app(e_1 e_2))) (mergemem ( (locs e_1) (locs e_2)))]
-  [(locs (fun(l_1 l_2 e))) (locs e)]
+  [(locs (fun(l_1 l_2 e))) (mergemem l_2 (mergemem(l_1 (locs e))))]
   [(locs (fun(x_1 x_2 e))) (mergemem((locs e) (locsfilter ((locs x_1) (locs x_2))) ))]
   [(locs e) ()] ;; if e is none of the above, it is will not have a location
 )
@@ -440,6 +442,10 @@
 ;;; This one evaluates to s(z),and tracing the returned l in sig will show that l points to a s(l') and l' will point to z
 ;; This is an example of ifz with zero.
 (judgment-holds (evdy (((1 2)) () ()) (ifz((app((fun(x y y)) z)) (s(z)) x z)) (1 2) n sig l) (sig l n))
+
+
+;;;;;;;;;; This is an interesting recursion case, we can see the function being replaced by its location in the outer ifz expression
+;;;;;;;;; Thus staying true to recursion.
 (judgment-holds (evdy (((1 2)) () ()) (app((fun(copy x (ifz(x z xx (s((app(copy xx)))))))) z)) (1 2) n sig l) (sig l n))
 
 ;;; The following is an example of ifz with the second branch taken. instead of z, it e evaluates to s(z) and
