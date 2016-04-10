@@ -116,10 +116,11 @@
   
 
 
-  #;[ (aljud sig (ifz(- e_2 x e_3)) (mergemem (r (locs e_1))) n_st1 sig_st1 l_st1)
+  [ (aljud sig (ifz(- e_2 x e_3)) (mergemem (r (locs e_1))) n_st1 sig_st1 l_st1)
     (evdy sig_st1 e_1 (mergemem (r (locs l_st1))) n_e1 sig_e1 l_e1)
-    (rjud sig_e1 l_e1 sig_z n_e z)  
-    (evdy sig_z e_2 r n_final sig_final l_final)
+    (rjud sig_e1 l_e1 sig_z n_e (s(l_s)))
+    (where e_3subst (subst x l_s e_3))
+    (evdy sig_z e_3subst r n_final sig_final l_final)
    ----------------------------------------------------------------------- tifz!0
     (evdy sig (ifz(e_1 e_2 x e_3)) r ,(+ (term n_st1) (term n_e1) (term n_e) (term n_final)) sig_final l_final)                                                                     
                                                                            
@@ -437,6 +438,12 @@
 (judgment-holds (evdy (((1 2)) () ()) (ifz((app((fun(x y y)) z)) z x z)) (1 2) n sig l) (sig l))
 
 ;;; This one evaluates to s(z),and tracing the returned l in sig will show that l points to a s(l') and l' will point to z
+;; This is an example of ifz with zero.
 (judgment-holds (evdy (((1 2)) () ()) (ifz((app((fun(x y y)) z)) (s(z)) x z)) (1 2) n sig l) (sig l n))
+(judgment-holds (evdy (((1 2)) () ()) (app((fun(copy x (ifz(x z xx (s((app(copy xx)))))))) z)) (1 2) n sig l) (sig l n))
+
+;;; The following is an example of ifz with the second branch taken. instead of z, it e evaluates to s(z) and
+;;; Thus follows the second branch.
+(judgment-holds (evdy (((1 2)) () ()) (ifz((app((fun(x y y)) (s(z)))) z x z)) (1 2) n sig l) (sig l n))
 
 (test-results)
