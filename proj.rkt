@@ -489,6 +489,64 @@
                  (1 2 3 4 5 6 7 8 9 10) n sig l) (sig n)) ;; we can observe the memory and the cost
                                                           ;; since I'm printing the memory (sig) and the cost (n).
 
+;; Sample output for the above --->
+;; Notice that the first list is the memory mu (1 2) ... has new members that were created during the runtime and evicted.
+;;; The second list is the read cache, which was empty at start and gets populated with the members from the RAM
+;;; As they were evicted, but needed to be read after eviction.
+;;; The third list is our allocation cache, exactly one block from it was evicted to the RAM and then read to the read cache.
+#;(((((1 2)
+     (2 3)
+     (3 4)
+     (4 5)
+     (5 6)
+     (6 7)
+     (7 8)
+     (8 9)
+     (9 10)
+     (10 11)
+     (11 12)
+     (12 13)
+     (13 14)
+     (14 15)
+     (15 16)
+     (16 17)
+     (1520527 (app (- (s ((app ((fun (copy x (ifz (x z xx (s ((app (copy xx)))))))) (s (z)))))))))
+     (9741015 (fun (copy x (ifz (x z xx (s ((app (copy xx)))))))))
+     (7082326 (app (9741015 -)))
+     (640749 (s (-))))
+    ((1520527 (app (- (s ((app ((fun (copy x (ifz (x z xx (s ((app (copy xx)))))))) (s (z)))))))))
+     (9741015 (fun (copy x (ifz (x z xx (s ((app (copy xx)))))))))
+     (7082326 (app (9741015 -)))
+     (640749 (s (-))))
+    ((6837221 (app (- (s (z)))))
+     (2976311 (fun (copy x (ifz (x z xx (s ((app (copy xx)))))))))
+     (2905610 (app (2976311 -)))
+     (946483 (s (-)))
+     (7037095 z)
+     (5556378 (s (7037095)))
+     (5363321 (ifz (- z xx (s ((app (2976311 xx)))))))
+     (3020367 (s (-)))
+     (6716545 (app (- 7037095)))
+     (4178081 (app (2976311 -)))
+     (1896668 (ifz (- z xx (s ((app (2976311 xx)))))))
+     (8516480 z)
+     (748459 (s (8516480)))
+     (7673956 (s (748459)))
+     (3222389 (ifz (- z xx (s ((app (9741015 xx)))))))
+     (2596915 (s (-)))
+     (6860675 (app (- 748459)))
+     (1474930 (app (9741015 -)))
+     (3524145 (ifz (- z xx (s ((app (9741015 xx)))))))
+     (7389210 (s (-)))
+     (5949880 (app (- 8516480)))
+     (7424480 (app (9741015 -)))
+     (3457697 (ifz (- z xx (s ((app (9741015 xx)))))))
+     (5222763 z)
+     (9646725 (s (5222763)))
+     (7013743 (s (9646725)))))
+   5))
+
+
 
 
 
