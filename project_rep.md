@@ -24,23 +24,24 @@ namely, allow for analysis of algorithms implemented in a high-level language to
 abstracting the memory management from the programmer. The setting used is call-by-value functional
 using recursive data types and get provable bounds on cache complexity.
 
-Question! ?? 
-We have tried to investigate the claims made by the paper, namely the Storage Model, Evaluation Dynamics and
-  "Reading and Allocation Judgments" defined by the paper
-and how they provide a basis of assessing the correctness and cache complexity of the programs.
-   The paper proposes 6 evaluation judgments and 6 reading and allocation judgments. The evaluation
-judgments are of the form : SIGMA @ e DOWN ARROW N R SIGMA @ L. We have tried to understand the functioning
+
+The paper raised the following questions for us when we first read it. How are the authors able to prove the bounds on costs? How do
+the evalutaion dynamics work and help in calculation the cost. Why were the memory allocation strategies chosen as they were. How does the
+paper relate the results from Evaluation Dynamics to the Abstract Machine proposed in the paper.
+  
+To elaborate, The paper proposes six evaluation judgments and a few auxiliary reading and allocation judgments to manage the memory. The evaluation
+judgments are of the form : SIGMA @ e DOWN ARROW N R SIGMA @ L. 
  and the logic behind these judgment forms and what led the author to write them as they are, as well as how
- they lead to a successful approximation. Finally, how does this approximation stack against the I/O model mentioned in the paper. 
+ they lead to a successful approximation. We did this by implementing a redex model of the Evaluation Dynamics as well as the storage model, which helped us to better understand the concepts presented in the paper.
 
     Our approach to study the evaluation dynamics was to read the relevant bits of the paper to build an intuitive but 
-  informal understanding of the evaluation dynamics, as suggested by the paper.  The next step was to try and build
+  informal understanding of the evaluation dynamics, as suggested by the paper.  The next step was building  
  a redex model of the language suggested as well as implementation of the cost dynamics. To do this we  developed
-the PCF language mentioned by the paper. We then tried to implement the evaluation dynamics as well as the 'reading and  allocation' judgments.
- Our methods helped us understand that the author has tried to account for all possible costs when proposing the 
- Cost Dynamics while minimizing the amount of unnecessary accesses to the RAM by mantaining a set of objects called ROOTS. At any step in the evaluation judgments, the author
-takes care of allocating the stack frames as well as accounting for all other allocations as necessary.
-  
+the PCF language mentioned by the paper. We then implemented the evaluation dynamics as well as the 'reading and  allocation' judgments.
+
+With the implementation of the redex model, we could understand the subtleties of the evaluation dynamics and the decisions made by the author
+while writing them. The basis of the evaluation dynamics is the simple fact that if we can account for every single cost of movement of data from the RAM to the cache and from the cache to the RAM, we will have a good approximate on the cost of evaluation. 
+
 The author also takes care to have the bounds of the cache properly accounted and has mechanism necessary for eviction when necessary.
  These conditions being when the cache is filled to the set capacity. 
     Finally, the costs accounted for each allocation, deallocation and read is carefully accounted and added to get the results. The paper then
