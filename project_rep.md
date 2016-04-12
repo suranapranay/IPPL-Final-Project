@@ -42,9 +42,9 @@ the PCF language mentioned by the paper. We then implemented the evaluation dyna
 With the implementation of the redex model, we could understand the subtleties of the evaluation dynamics and the decisions made by the author
 while writing them. The basis of the evaluation dynamics is the simple fact that if we can account for every single cost of movement of data from the RAM to the cache and from the cache to the RAM, we will have a good approximate on the cost of evaluation. 
 
-The author also takes care to have the bounds of the cache properly accounted and has mechanism necessary for eviction when necessary.
- These conditions being when the cache is filled to the set capacity. 
-    Finally, the costs accounted for each allocation, deallocation and read is carefully accounted and added to get the results. The paper then
-   proposes an abstract machine on which he proves that the cost incurred for each computation is indeed asymtopically equal to 
-   the cost determined by the evaluation dynamics. Since every transaction from the RAM to the cache and vice versa are recorded and the paper
-   designates costs based upon the same assumptions as the IO model we can agree that the algorithms written in this model will be as efficient as those written in I/O based model. We will try to implement a C program to try and validate the claim if possible.
+The authors track all the transaction of the memory by classifying them as Read and Allocation transactions. A read cost is added when the program accesses data not available in the cache and has to be copied from the RAM. An allocation cost is added to the total cost when a new object is created in the allocation cache.
+For each expression, the rules allocate a stack frame (even though they are never read). A root set which is a subset of the allocation cache is
+mantained and all objects in the nursery which are transitively reacheable from the roots are considered 'live'. When the number of live objects reaches the maximum size of the nursery, the oldest live objects are evicted from the nursery before an allocation can happen. This cost of movement is also accounted for. 
+The total cost of all the above scenarios is the cost assigned by the Evaluation dynamics to the program and since all possible costs were accounted in the evaluation dynamics, the predictions are considered at most a constant less than actual execution but of the same order.
+
+The authors do not explain the reason behind accounting only live objects when making the decision for eviction. The nursery is 
