@@ -25,26 +25,23 @@ abstracting the memory management from the programmer. The setting used is call-
 using recursive data types and get provable bounds on cache complexity.
 
 
-The paper raised the following questions for us when we first read it. How are the authors able to prove the bounds on costs? How do
-the evalutaion dynamics work and help in calculation the cost. Why were the memory allocation strategies chosen as they were. How does the
-paper relate the results from Evaluation Dynamics to the Abstract Machine proposed in the paper.
-  
+The paper raised the following questions - How are the authors able to prove the bounds on costs? How do
+the evalutaion dynamics work and help in calculation the cost. Why were the memory allocation strategies chosen as they were. Why do these dynamics lead to successful approximation of cache complexity of an algorithm. 
 To elaborate, The paper proposes six evaluation judgments and a few auxiliary reading and allocation judgments to manage the memory. The evaluation
 judgments are of the form : SIGMA @ e DOWN ARROW N R SIGMA @ L. 
- and the logic behind these judgment forms and what led the author to write them as they are, as well as how
- they lead to a successful approximation. We did this by implementing a redex model of the Evaluation Dynamics as well as the storage model, which helped us to better understand the concepts presented in the paper.
-
-    Our approach to study the evaluation dynamics was to read the relevant bits of the paper to build an intuitive but 
+This form means that when an expression is evaluated with respect to a memory store sigma and roots R, the cost of the evaluation is n, and the result is stored at location L.
+ Our approach to study the evaluation dynamics was to read the relevant bits of the paper to build an intuitive but 
   informal understanding of the evaluation dynamics, as suggested by the paper.  The next step was building  
  a redex model of the language suggested as well as implementation of the cost dynamics. To do this we  developed
 the PCF language mentioned by the paper. We then implemented the evaluation dynamics as well as the 'reading and  allocation' judgments.
 
 With the implementation of the redex model, we could understand the subtleties of the evaluation dynamics and the decisions made by the author
-while writing them. The basis of the evaluation dynamics is the simple fact that if we can account for every single cost of movement of data from the RAM to the cache and from the cache to the RAM, we will have a good approximate on the cost of evaluation. 
+while writing them. The basis of the evaluation dynamics is the fact that if we can account for every single cost of movement of data from the RAM to the cache and from the cache to the RAM, we will have a good approximate on the cost of evaluation.  Furthermore, if we can automate the memory management as opposed to letting the programmer handle it, we can have a definite accounting of the movement of data between the two levels of memory.
 
 The authors track all the transaction of the memory by classifying them as Read and Allocation transactions. A read cost is added when the program accesses data not available in the cache and has to be copied from the RAM. An allocation cost is added to the total cost when a new object is created in the allocation cache.
 For each expression, the rules allocate a stack frame (even though they are never read). A root set which is a subset of the allocation cache is
 mantained and all objects in the nursery which are transitively reacheable from the roots are considered 'live'. When the number of live objects reaches the maximum size of the nursery, the oldest live objects are evicted from the nursery before an allocation can happen. This cost of movement is also accounted for. 
 The total cost of all the above scenarios is the cost assigned by the Evaluation dynamics to the program and since all possible costs were accounted in the evaluation dynamics, the predictions are considered at most a constant less than actual execution but of the same order.
 
-The authors do not explain the reason behind accounting only live objects when making the decision for eviction. The nursery is 
+The authors do not explain the reason behind accounting only live objects when making the decision for eviction. The nursery can be filled with objects that are not live. We say this because should the nursery only have live objects, there would be no need to keep track of a root set. This would mean that the nursery can extend indefinitely, but that is not true in a real computer.
+Thus, to conclude, the paper presents convincing model for analyzing algorithms in systems where there are two memories, it seems to present an ideal case and does not seem to explain the reasoning behind the live objects and root set.
